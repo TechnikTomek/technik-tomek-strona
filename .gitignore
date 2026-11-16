@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+._*
+# Edytory
+.vscode/
+.idea/
+*.swp
+# Pliki lokalne / sekrety – nigdy nie commituj
+.env
+*.local
+node_modules/

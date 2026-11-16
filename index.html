@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<!--
+==========================================================================
+  TECHNIK TOMEK – strona-wizytówka kanału YouTube
+  Jeden plik: HTML + CSS (<style>) + JS (<script>). Bez frameworków.
+==========================================================================
+
+  1) JAK ZDOBYĆ KLUCZ YOUTUBE DATA API v3
+     a. Wejdź na https://console.cloud.google.com/ i zaloguj się kontem Google.
+     b. U góry kliknij wybór projektu → „Nowy projekt” → nazwa np. „technik-tomek-strona” → „Utwórz”.
+     c. Menu ☰ → „Interfejsy API i usługi” → „Biblioteka” → wyszukaj „YouTube Data API v3” → „Włącz”.
+     d. Menu ☰ → „Interfejsy API i usługi” → „Dane logowania” → „+ Utwórz dane logowania”
+        → „Klucz interfejsu API”. Skopiuj klucz.
+     e. Wklej klucz do CONFIG.YOUTUBE_API_KEY (sekcja <script> na dole tego pliku).
+     Limit darmowy: 10 000 jednostek dziennie. Strona zużywa ok. 3 jednostki na odświeżenie danych,
+     a wyniki trzyma w pamięci przeglądarki przez 1 godzinę.
+
+  2) JAK OGRANICZYĆ KLUCZ (OBOWIĄZKOWE – repozytorium jest publiczne!)
+     a. „Interfejsy API i usługi” → „Dane logowania” → kliknij nazwę swojego klucza.
+     b. „Ograniczenia aplikacji” → „Strony internetowe” (odsyłacze HTTP) → „Dodaj” →
+          https://techniktomek.github.io/*
+        (jeśli kiedyś podepniesz własną domenę, dodaj też np. https://twojadomena.pl/*)
+     c. „Ograniczenia interfejsów API” → „Ogranicz klucz” → zaznacz TYLKO „YouTube Data API v3”.
+     d. „Zapisz”. Ograniczenia zaczynają działać po kilku minutach.
+     Uwaga: klucz ograniczony do domeny nie zadziała po otwarciu pliku z dysku (file://) –
+     strona pokaże wtedy dane zapasowe z CONFIG.fallback. To normalne zachowanie.
+
+  3) GDZIE ZMIENIĆ TEKSTY, LINKI I KOLORY
+     • Teksty, e-mail, linki społecznościowe, dane zapasowe → obiekt CONFIG na początku <script>.
+       – CONFIG.texts      – opisy w hero, „O kanale”, kontakt
+       – CONFIG.links      – kafelki z linkami (pusty „url” = kafelek ukryty automatycznie)
+       – CONFIG.fallback   – liczby i lista filmów pokazywane, gdy nie ma klucza API / API nie działa
+     • Kolory i wygląd → zmienne CSS w :root na początku <style> (np. --cyan, --bg, --card).
+     • Po zmianie: git add . && git commit -m "opis zmiany" && git push
+       GitHub Pages zaktualizuje stronę po około minucie.
+==========================================================================
+-->
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Technik Tomek – kanał YouTube</title>
+<meta name="description" content="Technik Tomek – kanał YouTube o technologii, kodowaniu i tworzeniu własnych projektów. Najnowsze filmy, linki i kontakt.">
+<meta name="theme-color" content="#000000">
+<meta property="og:title" content="Technik Tomek – kanał YouTube">
+<meta property="og:description" content="Technologia, kodowanie i własne projekty – od pomysłu do działającej aplikacji.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23000'/%3E%3Cpath d='M12 18h18v5h-6.5v24h-5V23H12zM34 18h18v5h-6.5v24h-5V23H34z' fill='%2300e5ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ===== KOLORY I WYGLĄD – zmieniaj tutaj ===== */
+  :root {
+    --bg: #05070a;
+    --bg-deep: #000;
+    --card: #0a0f15;
+    --card-2: #0d141c;
+    --cyan: #00e5ff;          /* kolor główny (logo) */
+    --cyan-2: #3ab5ff;        /* niebieski z banera */
+    --cyan-rgb: 0, 229, 255;
+    --text: #e8f6fa;
+    --muted: #8ea4ae;
+    --border: rgba(var(--cyan-rgb), .16);
+    --border-strong: rgba(var(--cyan-rgb), .45);
+    --radius: 16px;
+    --nav-h: 68px;
+    --font-head: "Orbitron", "Rajdhani", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: calc(var(--nav-h) + 12px); -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: var(--cyan); text-decoration: none; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 6px; }
+  .container { width: min(1160px, 100% - 32px); margin-inline: auto; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ===== LOGO (neon) ===== */
+  .logo {
+    font-family: var(--font-head); font-weight: 700; text-transform: uppercase;
+    letter-spacing: .2em; color: var(--cyan); white-space: nowrap;
+    text-shadow: 0 0 4px rgba(var(--cyan-rgb), .55), 0 0 14px rgba(var(--cyan-rgb), .35);
+  }
+  .logo-big {
+    display: block; margin: 0; line-height: 1.12;
+    font-size: clamp(2rem, 7.4vw, 5.2rem); letter-spacing: .14em; font-weight: 800;
+    text-shadow: 0 0 6px rgba(var(--cyan-rgb), .7), 0 0 22px rgba(var(--cyan-rgb), .45), 0 0 60px rgba(var(--cyan-rgb), .25);
+    animation: neon-on 1.6s ease-out both;
+  }
+  .logo-big span { display: inline-block; margin-right: -.14em; }
+  @keyframes neon-on {
+    0% { opacity: 0; } 12% { opacity: .9; } 16% { opacity: .2; } 24% { opacity: 1; } 30% { opacity: .5; } 40%, 100% { opacity: 1; }
+  }
+
+  /* ===== NAWIGACJA ===== */
+  .nav {
+    position: sticky; top: 0; z-index: 50; height: var(--nav-h);
+    background: rgba(0, 0, 0, .72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid transparent; transition: border-color .3s, background .3s;
+  }
+  .nav.scrolled { border-bottom-color: var(--border); background: rgba(0, 0, 0, .88); }
+  .nav .container { height: 100%; display: flex; align-items: center; gap: 24px; }
+  .nav .logo { font-size: 15px; }
+  .nav-links { display: flex; gap: 6px; margin-left: auto; list-style: none; padding: 0; margin-block: 0; }
+  .nav-links a {
+    display: block; padding: 8px 14px; border-radius: 10px; color: var(--muted);
+    font-weight: 500; font-size: 15px; transition: color .2s, background .2s;
+  }
+  .nav-links a:hover, .nav-links a.active { color: var(--cyan); background: rgba(var(--cyan-rgb), .07); }
+  .nav .btn-sub { padding: 10px 18px; font-size: 14px; }
+  .burger {
+    display: none; margin-left: auto; width: 44px; height: 44px; border-radius: 10px;
+    background: transparent; border: 1px solid var(--border); cursor: pointer; position: relative;
+  }
+  .burger span, .burger::before, .burger::after {
+    content: ""; position: absolute; left: 11px; right: 11px; height: 2px; background: var(--cyan);
+    border-radius: 2px; transition: transform .3s, opacity .2s;
+  }
+  .burger::before { top: 14px; } .burger span { top: 21px; } .burger::after { top: 28px; }
+  .nav.open .burger::before { transform: translateY(7px) rotate(45deg); }
+  .nav.open .burger span { opacity: 0; }
+  .nav.open .burger::after { transform: translateY(-7px) rotate(-45deg); }
+
+  /* ===== PRZYCISKI ===== */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px 26px; border-radius: 12px; font-weight: 600; font-size: 16px; line-height: 1.2;
+    border: 1px solid var(--border-strong); background: rgba(var(--cyan-rgb), .06); color: var(--text);
+    cursor: pointer; transition: transform .2s, background .2s, border-color .2s, box-shadow .2s; white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-2px); border-color: var(--cyan); background: rgba(var(--cyan-rgb), .12); }
+  .btn svg { width: 20px; height: 20px; flex: none; }
+  .btn-sub {
+    background: var(--cyan); color: #001318; border-color: var(--cyan);
+    box-shadow: 0 0 0 0 rgba(var(--cyan-rgb), .55);
+    animation: pulse 2.4s infinite;
+  }
+  .btn-sub:hover { background: #5cf0ff; border-color: #5cf0ff; color: #001318; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(var(--cyan-rgb), .55), 0 0 18px rgba(var(--cyan-rgb), .35); }
+    70% { box-shadow: 0 0 0 14px rgba(var(--cyan-rgb), 0), 0 0 18px rgba(var(--cyan-rgb), .35); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--cyan-rgb), 0), 0 0 18px rgba(var(--cyan-rgb), .35); }
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    position: relative; overflow: hidden; isolation: isolate;
+    min-height: calc(100svh - var(--nav-h)); display: flex; align-items: center;
+    padding: 64px 0 96px; background: radial-gradient(ellipse 70% 55% at 50% 38%, rgba(var(--cyan-rgb), .09), transparent 70%), var(--bg-deep);
+  }
+  #eq { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  .hero::after { /* przejście do tła strony */
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 120px; z-index: -1;
+    background: linear-gradient(transparent, var(--bg));
+  }
+  /* dekoracyjne panele inspirowane banerem */
+  .deco { position: absolute; z-index: -1; pointer-events: none; width: clamp(180px, 26vw, 360px); height: auto; opacity: .55; }
+  .deco path { fill: rgba(58, 181, 255, .07); stroke: rgba(58, 181, 255, .45); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .deco path.inner { fill: none; stroke: rgba(58, 181, 255, .22); }
+  .deco-tl { top: 0; left: 0; }
+  .deco-br { bottom: 0; right: 0; transform: rotate(180deg); }
+  .hero-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .avatar-wrap {
+    position: relative; width: 120px; height: 120px; border-radius: 50%; padding: 3px;
+    background: conic-gradient(from 0deg, var(--cyan), var(--cyan-2), transparent 60%, var(--cyan));
+    box-shadow: 0 0 34px rgba(var(--cyan-rgb), .35);
+  }
+  .avatar-wrap img, .avatar-fallback {
+    width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #000; border: 3px solid #000;
+  }
+  .avatar-fallback {
+    display: none; place-items: center; text-align: center; font-family: var(--font-head);
+    font-weight: 700; font-size: 13px; letter-spacing: .14em; line-height: 1.5; color: var(--cyan);
+    text-shadow: 0 0 8px rgba(var(--cyan-rgb), .6);
+  }
+  .avatar-wrap.no-img img { display: none; }
+  .avatar-wrap.no-img .avatar-fallback { display: grid; }
+  .stripes {
+    width: min(360px, 70vw); height: 18px; opacity: .85;
+    background: repeating-linear-gradient(115deg, var(--cyan-2) 0 7px, transparent 7px 20px);
+    -webkit-mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+            mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+    animation: stripes 2.2s linear infinite;
+  }
+  @keyframes stripes { to { background-position: 41px 0; } }
+  .hero-desc { max-width: 640px; margin: 0; color: #c3d5db; font-size: clamp(1rem, 2.2vw, 1.15rem); }
+  .stats { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 14px; width: min(720px, 100%); margin-top: 6px; }
+  .stat {
+    background: linear-gradient(180deg, rgba(13, 20, 28, .82), rgba(5, 8, 12, .82));
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 12px 16px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .stat-num {
+    display: block; font-family: var(--font-head); font-weight: 700; line-height: 1.1;
+    font-size: clamp(1.5rem, 4.4vw, 2.3rem); color: #fff; font-variant-numeric: tabular-nums;
+  }
+  .stat-main { border-color: var(--border-strong); box-shadow: 0 0 30px rgba(var(--cyan-rgb), .14), inset 0 0 24px rgba(var(--cyan-rgb), .05); }
+  .stat-main .stat-num { color: var(--cyan); font-size: clamp(1.9rem, 6vw, 3rem); text-shadow: 0 0 18px rgba(var(--cyan-rgb), .5); }
+  .stat-label { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .12em; }
+  .hero-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 8px; }
+  .scroll-hint {
+    position: absolute; bottom: 26px; left: 50%; translate: -50% 0; width: 26px; height: 42px;
+    border: 2px solid var(--border-strong); border-radius: 14px; opacity: .7;
+  }
+  .scroll-hint::after {
+    content: ""; position: absolute; top: 8px; left: 50%; width: 4px; height: 8px; margin-left: -2px;
+    border-radius: 2px; background: var(--cyan); animation: wheel 1.8s ease-in-out infinite;
+  }
+  @keyframes wheel { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
+
+  /* ===== SEKCJE ===== */
+  section.block { padding: clamp(48px, 6.5vw, 84px) 0; position: relative; }
+  .section-head { margin-bottom: 36px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px; color: var(--cyan);
+    font-family: var(--font-head); font-size: 12px; font-weight: 600; letter-spacing: .28em; text-transform: uppercase;
+  }
+  .eyebrow::before { content: ""; width: 28px; height: 2px; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+  h2 {
+    margin: 10px 0 0; font-family: var(--font-head); font-weight: 700; letter-spacing: .04em;
+    font-size: clamp(1.6rem, 4vw, 2.5rem); line-height: 1.2;
+  }
+  .section-sub { margin: 10px 0 0; color: var(--muted); max-width: 620px; }
+  .card {
+    background: linear-gradient(180deg, var(--card-2), var(--card));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .4), 0 10px 40px rgba(0, 0, 0, .45), 0 0 30px rgba(var(--cyan-rgb), .04);
+  }
+
+  /* pojawianie się przy przewijaniu (tylko gdy JS działa) */
+  .js .reveal:not(.in) { opacity: 0; }
+  .js .reveal.in { animation: rise .8s cubic-bezier(.2, .7, .2, 1) backwards; }
+  .js .reveal.d1 { animation-delay: .1s; } .js .reveal.d2 { animation-delay: .2s; } .js .reveal.d3 { animation-delay: .3s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+
+  /* ===== NAJNOWSZY FILM ===== */
+  .latest { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 0; overflow: hidden; }
+  .player { position: relative; aspect-ratio: 16 / 9; background: #000; }
+  .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .latest-info { padding: 28px; display: flex; flex-direction: column; gap: 12px; border-left: 1px solid var(--border); }
+  .badge {
+    align-self: flex-start; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase; color: #001318; background: var(--cyan);
+    box-shadow: 0 0 16px rgba(var(--cyan-rgb), .5);
+  }
+  .latest-info h3 { margin: 0; font-size: clamp(1.25rem, 2.6vw, 1.6rem); line-height: 1.3; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 14px; }
+  .meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .meta svg { width: 16px; height: 16px; opacity: .8; }
+  .latest-desc { margin: 0; color: #b9cbd1; font-size: 15px; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+  .latest-info .btn { margin-top: auto; align-self: flex-start; }
+  /* zaślepka odtwarzacza (plik otwarty z dysku) */
+  .facade { position: absolute; inset: 0; display: block; cursor: pointer; border: 0; padding: 0; background: #000; }
+  .facade img { width: 100%; height: 100%; object-fit: cover; opacity: .8; transition: opacity .3s; }
+  .facade:hover img { opacity: 1; }
+  .play {
+    position: absolute; top: 50%; left: 50%; translate: -50% -50%; width: 78px; height: 78px; border-radius: 50%;
+    display: grid; place-items: center; background: rgba(0, 0, 0, .6); border: 2px solid var(--cyan);
+    box-shadow: 0 0 30px rgba(var(--cyan-rgb), .55); transition: transform .25s;
+  }
+  .play svg { width: 30px; height: 30px; margin-left: 4px; fill: var(--cyan); }
+  .facade:hover .play, .vcard:hover .play { transform: scale(1.08); }
+  .facade-note {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 8px 12px; border-radius: 10px;
+    background: rgba(0, 0, 0, .75); color: #cfe3e8; font-size: 12px; line-height: 1.4; text-align: center;
+  }
+
+  /* ===== SIATKA FILMÓW ===== */
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+  .vcard {
+    display: flex; flex-direction: column; text-align: left; padding: 0; cursor: pointer; overflow: hidden;
+    transition: transform .3s cubic-bezier(.2, .7, .2, 1), box-shadow .3s, border-color .3s; color: var(--text);
+  }
+  .vcard:hover, .vcard:focus-visible {
+    transform: translateY(-8px); border-color: var(--border-strong);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .6), 0 0 34px rgba(var(--cyan-rgb), .18);
+  }
+  .thumb { position: relative; aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s; }
+  .vcard:hover .thumb img { transform: scale(1.06); }
+  .thumb .play { width: 56px; height: 56px; opacity: 0; transition: opacity .3s, transform .25s; }
+  .thumb .play svg { width: 22px; height: 22px; }
+  .vcard:hover .thumb .play, .vcard:focus-visible .thumb .play { opacity: 1; }
+  .thumb .badge { position: absolute; top: 10px; left: 10px; font-size: 11px; padding: 4px 10px; }
+  .vbody { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .vtitle { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .vcard .meta { font-size: 13px; margin-top: auto; }
+  .cta-card {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center;
+    padding: 28px; min-height: 100%; border-style: dashed; border-color: var(--border-strong);
+  }
+  .cta-card p { margin: 0; color: var(--muted); }
+  .cta-card strong { font-family: var(--font-head); font-size: 17px; color: var(--text); letter-spacing: .04em; }
+  .center { text-align: center; margin-top: 36px; }
+
+  /* szkielety */
+  .skel { position: relative; overflow: hidden; background: #0e151d; border-radius: 8px; }
+  .skel::after {
+    content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(var(--cyan-rgb), .08), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { to { transform: translateX(100%); } }
+  .skel-thumb { aspect-ratio: 16 / 9; border-radius: 0; }
+  .skel-line { height: 14px; margin: 4px 0; }
+  .skel-line.w60 { width: 60%; } .skel-line.w40 { width: 40%; } .skel-line.w80 { width: 80%; }
+
+  /* ===== O KANALE ===== */
+  .about { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  .about-text { padding: clamp(24px, 4vw, 40px); }
+  .about-text h3 { margin: 0 0 14px; font-size: 1.3rem; }
+  .about-text p { margin: 0 0 14px; color: #c3d5db; }
+  .about-text p:last-child { margin-bottom: 0; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .tag { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); color: var(--cyan); font-size: 13px; background: rgba(var(--cyan-rgb), .04); }
+  .tiles { display: grid; gap: 16px; }
+  .tile { display: flex; align-items: center; gap: 18px; padding: 22px 24px; transition: border-color .3s, transform .3s; }
+  .tile:hover { border-color: var(--border-strong); transform: translateX(4px); }
+  .tile-ico {
+    flex: none; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+    background: rgba(var(--cyan-rgb), .08); border: 1px solid var(--border);
+  }
+  .tile-ico svg { width: 26px; height: 26px; stroke: var(--cyan); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tile .stat-num { font-size: 1.6rem; }
+  .tile .stat-label { margin-top: 2px; }
+
+  /* ===== LINKI ===== */
+  .links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .link-tile {
+    --brand: var(--cyan);
+    display: flex; align-items: center; gap: 18px; padding: 22px 24px; color: var(--text);
+    transition: transform .3s cubic-bezier(.2, .7, .2, 1), border-color .3s, box-shadow .3s;
+  }
+  .link-tile:hover { transform: translateY(-5px); border-color: var(--border-strong); box-shadow: 0 16px 40px rgba(0, 0, 0, .55), 0 0 28px rgba(var(--cyan-rgb), .16); }
+  .link-ico {
+    flex: none; width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center;
+    background: #000; border: 1px solid var(--border); transition: background .3s, box-shadow .3s;
+  }
+  .link-ico svg { width: 28px; height: 28px; color: var(--cyan); }
+  .link-tile:hover .link-ico { background: rgba(var(--cyan-rgb), .1); box-shadow: 0 0 20px rgba(var(--cyan-rgb), .35); }
+  .link-text { min-width: 0; }
+  .link-text strong { display: block; font-size: 17px; }
+  .link-text span { display: block; color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .link-arrow { margin-left: auto; width: 20px; height: 20px; flex: none; stroke: var(--muted); fill: none; stroke-width: 2; transition: transform .3s, stroke .3s; }
+  .link-tile:hover .link-arrow { transform: translate(3px, -3px); stroke: var(--cyan); }
+
+  /* ===== KONTAKT ===== */
+  .contact { padding: clamp(28px, 5vw, 56px); text-align: center; position: relative; overflow: hidden; }
+  .contact::before {
+    content: ""; position: absolute; inset: auto -20% -60% -20%; height: 120%; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(var(--cyan-rgb), .12), transparent 60%);
+  }
+  .contact > * { position: relative; }
+  .contact p { color: #c3d5db; max-width: 560px; margin: 14px auto 0; }
+  .email-box {
+    display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+    margin-top: 26px; padding: 8px 8px 8px 22px; border-radius: 14px; border: 1px solid var(--border-strong);
+    background: #000; max-width: 100%;
+  }
+  .email-addr { font-family: var(--font-head); font-size: clamp(.85rem, 2.6vw, 1.1rem); letter-spacing: .03em; color: var(--cyan); word-break: break-all; }
+  .email-box .btn { padding: 11px 18px; font-size: 15px; }
+  .contact-actions { margin-top: 18px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; translate: -50% 20px; opacity: 0; pointer-events: none; z-index: 120;
+    padding: 12px 22px; border-radius: 12px; background: var(--cyan); color: #001318; font-weight: 600;
+    box-shadow: 0 0 30px rgba(var(--cyan-rgb), .5); transition: opacity .3s, translate .3s;
+  }
+  .toast.show { opacity: 1; translate: -50% 0; }
+
+  /* ===== STOPKA ===== */
+  footer { border-top: 1px solid var(--border); padding: 36px 0; color: var(--muted); font-size: 14px; }
+  footer .container { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+  footer .logo { font-size: 13px; }
+
+  /* ===== MODAL ===== */
+  .modal {
+    position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px;
+    background: rgba(0, 0, 0, .85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s;
+  }
+  .modal.open { opacity: 1; visibility: visible; }
+  .modal-box { width: min(1000px, 100%); transform: scale(.96); transition: transform .3s; }
+  .modal.open .modal-box { transform: none; }
+  .modal-box .player { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border-strong); box-shadow: 0 0 60px rgba(var(--cyan-rgb), .2); }
+  .modal-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .modal-title { margin: 0; font-size: 17px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal-close {
+    flex: none; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--border-strong);
+    background: #000; cursor: pointer; display: grid; place-items: center;
+  }
+  .modal-close svg { width: 20px; height: 20px; stroke: var(--cyan); stroke-width: 2.4; }
+  .modal-close:hover { background: rgba(var(--cyan-rgb), .12); }
+
+  /* ===== RESPONSYWNOŚĆ ===== */
+  @media (max-width: 960px) {
+    .grid, .links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .latest { grid-template-columns: 1fr; }
+    .latest-info { border-left: 0; border-top: 1px solid var(--border); }
+    .about { grid-template-columns: 1fr; }
+    .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tile { flex-direction: column; text-align: center; gap: 10px; padding: 20px 12px; }
+    .tile:hover { transform: translateY(-4px); }
+  }
+  @media (max-width: 820px) {
+    .burger { display: block; }
+    .nav-menu {
+      position: fixed; top: var(--nav-h); left: 0; right: 0; padding: 12px 16px 22px;
+      background: rgba(0, 0, 0, .96); border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 14px;
+      transform: translateY(-12px); opacity: 0; visibility: hidden; transition: transform .3s, opacity .3s, visibility .3s;
+    }
+    .nav.open .nav-menu { transform: none; opacity: 1; visibility: visible; }
+    .nav-links { flex-direction: column; margin: 0; }
+    .nav-links a { padding: 13px 14px; font-size: 17px; }
+    .nav-menu .btn-sub { width: 100%; padding: 14px; font-size: 16px; }
+  }
+  @media (min-width: 821px) { .nav-menu { display: contents; } }
+  @media (max-width: 620px) {
+    .grid, .links { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stat-main { grid-column: 1 / -1; }
+    .tiles { grid-template-columns: 1fr; }
+    .tile { flex-direction: row; text-align: left; padding: 18px 20px; }
+    .hero { padding: 40px 0 88px; }
+    .avatar-wrap { width: 96px; height: 96px; }
+    .hero-actions { width: 100%; }
+    .hero-actions .btn { flex: 1 1 100%; }
+    .latest-info { padding: 22px; }
+    .deco { opacity: .4; }
+    .email-box { padding: 14px; flex-direction: column; width: 100%; }
+    .email-box .btn { width: 100%; }
+    footer .container { flex-direction: column; text-align: center; }
+  }
+  @media (max-width: 380px) { .nav .logo { font-size: 13px; letter-spacing: .14em; } }
+
+  /* ===== OGRANICZONY RUCH ===== */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+    .btn-sub { animation: none; box-shadow: 0 0 18px rgba(var(--cyan-rgb), .35); }
+    .js .reveal:not(.in) { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<a class="sr-only" href="#filmy">Przejdź do treści</a>
+
+<!-- ===== NAWIGACJA ===== -->
+<header class="nav" id="nav">
+  <div class="container">
+    <a href="#top" class="logo" aria-label="Technik Tomek – strona główna">Technik Tomek</a>
+    <button class="burger" id="burger" aria-label="Otwórz menu" aria-expanded="false" aria-controls="nav-menu"><span></span></button>
+    <div class="nav-menu" id="nav-menu">
+      <ul class="nav-links">
+        <li><a href="#filmy">Filmy</a></li>
+        <li><a href="#o-kanale">O kanale</a></li>
+        <li><a href="#linki">Linki</a></li>
+        <li><a href="#kontakt">Kontakt</a></li>
+      </ul>
+      <a class="btn btn-sub js-sub" href="#" target="_blank" rel="noopener">Subskrybuj</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ===== HERO ===== -->
+  <section class="hero" id="top">
+    <canvas id="eq" aria-hidden="true"></canvas>
+    <svg class="deco deco-tl" viewBox="0 0 360 240" aria-hidden="true"><path d="M0 0H300V150Q300 172 283 188L210 230Q197 240 180 240H0Z"/><path class="inner" d="M0 0H276V146Q276 162 263 174L198 214Q188 220 175 220H0"/></svg>
+    <svg class="deco deco-br" viewBox="0 0 360 240" aria-hidden="true"><path d="M0 0H300V150Q300 172 283 188L210 230Q197 240 180 240H0Z"/><path class="inner" d="M0 0H276V146Q276 162 263 174L198 214Q188 220 175 220H0"/></svg>
+    <div class="container hero-inner">
+      <div class="avatar-wrap" id="avatar-wrap">
+        <img id="avatar" alt="Avatar kanału Technik Tomek" width="120" height="120" referrerpolicy="no-referrer">
+        <div class="avatar-fallback" aria-hidden="true">TECHNIK<br>TOMEK</div>
+      </div>
+      <h1 class="logo logo-big"><span>Technik</span> <span>Tomek</span></h1>
+      <div class="stripes" aria-hidden="true"></div>
+      <p class="hero-desc" id="hero-desc"></p>
+      <div class="stats" aria-live="polite">
+        <div class="stat stat-main"><span class="stat-num" id="subs">–</span><span class="stat-label">Subskrypcje</span></div>
+        <div class="stat"><span class="stat-num" id="vcount">–</span><span class="stat-label">Filmy</span></div>
+        <div class="stat"><span class="stat-num" id="views">–</span><span class="stat-label">Wyświetlenia</span></div>
+      </div>
+      <div class="hero-actions">
+        <a class="btn btn-sub js-sub" href="#" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.2 3.6z"/></svg>
+          Subskrybuj
+        </a>
+        <a class="btn" href="#najnowszy">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.7L9.5 4.6A1 1 0 0 0 8 5.5z"/></svg>
+          Oglądaj najnowszy film
+        </a>
+      </div>
+    </div>
+    <div class="scroll-hint" aria-hidden="true"></div>
+  </section>
+
+  <!-- ===== NAJNOWSZY FILM ===== -->
+  <section class="block" id="najnowszy">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="eyebrow">Świeżo wrzucone</span>
+        <h2>Najnowszy film</h2>
+      </div>
+      <div class="card latest reveal d1" id="latest">
+        <div class="player"><div class="skel" style="position:absolute;inset:0;border-radius:0"></div></div>
+        <div class="latest-info">
+          <div class="skel skel-line w40"></div>
+          <div class="skel skel-line w80" style="height:22px"></div>
+          <div class="skel skel-line w60"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== OSTATNIE FILMY ===== -->
+  <section class="block" id="filmy">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="eyebrow">Na kanale</span>
+        <h2>Ostatnie filmy</h2>
+        <p class="section-sub">Kliknij miniaturę, aby obejrzeć film bez wychodzenia ze strony.</p>
+      </div>
+      <div class="grid" id="grid" aria-busy="true">
+        <!-- szkielety kart (podmieniane po wczytaniu danych) -->
+        <div class="card"><div class="skel skel-thumb"></div><div class="vbody"><div class="skel skel-line w80"></div><div class="skel skel-line w40"></div></div></div>
+        <div class="card"><div class="skel skel-thumb"></div><div class="vbody"><div class="skel skel-line w80"></div><div class="skel skel-line w40"></div></div></div>
+        <div class="card"><div class="skel skel-thumb"></div><div class="vbody"><div class="skel skel-line w80"></div><div class="skel skel-line w40"></div></div></div>
+        <div class="card"><div class="skel skel-thumb"></div><div class="vbody"><div class="skel skel-line w80"></div><div class="skel skel-line w40"></div></div></div>
+        <div class="card"><div class="skel skel-thumb"></div><div class="vbody"><div class="skel skel-line w80"></div><div class="skel skel-line w40"></div></div></div>
+        <div class="card"><div class="skel skel-thumb"></div><div class="vbody"><div class="skel skel-line w80"></div><div class="skel skel-line w40"></div></div></div>
+      </div>
+      <div class="center reveal">
+        <a class="btn js-videos" href="#" target="_blank" rel="noopener">
+          Zobacz wszystkie na YouTube
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== O KANALE ===== -->
+  <section class="block" id="o-kanale">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="eyebrow">Kim jestem</span>
+        <h2>O kanale</h2>
+      </div>
+      <div class="about">
+        <div class="card about-text reveal" id="about-text"></div>
+        <div class="tiles">
+          <div class="card tile reveal d1">
+            <div class="tile-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="15" height="14" rx="2.5"/><path d="m17 10 5-3v10l-5-3"/></svg></div>
+            <div><span class="stat-num" id="t-videos">–</span><span class="stat-label">Opublikowane filmy</span></div>
+          </div>
+          <div class="card tile reveal d2">
+            <div class="tile-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></div>
+            <div><span class="stat-num" id="t-views">–</span><span class="stat-label">Łączne wyświetlenia</span></div>
+          </div>
+          <div class="card tile reveal d3">
+            <div class="tile-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></div>
+            <div><span class="stat-num" id="t-since">–</span><span class="stat-label">Na YouTube od</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== LINKI ===== -->
+  <section class="block" id="linki">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="eyebrow">Znajdziesz mnie tu</span>
+        <h2>Linki</h2>
+      </div>
+      <div class="links" id="links"></div>
+    </div>
+  </section>
+
+  <!-- ===== KONTAKT ===== -->
+  <section class="block" id="kontakt">
+    <div class="container">
+      <div class="card contact reveal">
+        <span class="eyebrow">Współpraca</span>
+        <h2>Kontakt</h2>
+        <p id="contact-text"></p>
+        <div class="email-box">
+          <span class="email-addr" id="email"></span>
+          <button class="btn btn-copy" id="copy" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+            <span>Kopiuj</span>
+          </button>
+        </div>
+        <div class="contact-actions"><a class="btn" id="mailto" href="#">Napisz e-mail</a></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    <span class="logo">Technik Tomek</span>
+    <span>© <span id="year"></span> Technik Tomek. Wszelkie prawa zastrzeżone.</span>
+  </div>
+</footer>
+
+<!-- ===== MODAL Z FILMEM ===== -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
+  <div class="modal-box">
+    <div class="modal-bar">
+      <h3 class="modal-title" id="modal-title"></h3>
+      <button class="modal-close" id="modal-close" type="button" aria-label="Zamknij film">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg>
+      </button>
+    </div>
+    <div class="player" id="modal-player"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   CONFIG – tutaj zmieniasz teksty, linki i dane zapasowe
+   ===================================================================== */
+const CONFIG = {
+  channelName: 'Technik Tomek',
+  handle: '@TechnikTomek',
+
+  // Klucz YouTube Data API v3. ZOSTAW PUSTY, dopóki nie ograniczysz klucza
+  // w Google Cloud do https://techniktomek.github.io/* i tylko do YouTube Data API v3.
+  YOUTUBE_API_KEY: '',
+
+  videosToShow: 9,        // ile filmów pokazać w siatce (6–9)
+  cacheMinutes: 60,       // jak długo trzymać dane z API w przeglądarce
+
+  texts: {
+    heroDescription: 'Technologia, kodowanie i własne projekty – od pomysłu do działającej aplikacji. Prosto, konkretnie i bez lania wody.',
+    aboutTitle: 'Cześć! Z tej strony Technik Tomek.',
+    about: [
+      'Fascynuje mnie technologia, kodowanie i przekuwanie pomysłów w działające projekty. Na tym kanale dzielę się swoją drogą, procesem tworzenia aplikacji oraz wiedzą techniczną – prosto, bez zbędnego lania wody i zawsze na konkretnych przykładach.',
+      'Niezależnie od tego, czy stawiasz pierwsze kroki w programowaniu, czy szukasz inspiracji do własnych projektów narzędziowych i webowych – znajdziesz tu coś dla siebie.',
+      'Zostaw subskrypcję, włącz dzwonek i dołącz do dyskusji w komentarzach pod filmami!'
+    ],
+    tags: ['Programowanie', 'Linux', 'Aplikacje webowe', 'Projekty DIY', 'Technologia'],
+    contact: 'Masz pomysł na współpracę, film albo wspólny projekt? Napisz do mnie – odpowiadam na każdą wiadomość.'
+  },
+
+  email: 'kontakt.techniktomek@gmail.com',
+
+  // Kafelki z linkami. Pusty "url" = kafelek się nie pokaże.
+  // Dostępne ikony (type): youtube, tiktok, instagram, discord, spotify, email
+  links: [
+    { type: 'youtube',   label: 'YouTube',   sub: '@TechnikTomek', url: 'https://www.youtube.com/@TechnikTomek' },
+    { type: 'tiktok',    label: 'TikTok',    sub: '',              url: '' },
+    { type: 'instagram', label: 'Instagram', sub: '',              url: '' },
+    { type: 'discord',   label: 'Discord',   sub: '',              url: '' },
+    { type: 'spotify',   label: 'Spotify',   sub: '',              url: '' },
+    { type: 'email',     label: 'E-mail',    sub: 'kontakt.techniktomek@gmail.com', url: 'mailto:kontakt.techniktomek@gmail.com' }
+  ],
+
+  // Dane zapasowe – pokazywane, gdy nie ma klucza API albo API zwróci błąd.
+  // Zaktualizuj je czasem ręcznie. W "videos" możesz podać same ID: ['abc123xyz00', ...]
+  fallback: {
+    avatar: 'https://yt3.googleusercontent.com/VxX5QQq_XKeoaa9vux7bogNiHsWpQCYYB8VJqwIewEliUqTF6Zr5EeMIB1IfOn3yTWJD3gOIqQ=s240-c-k-c0x00ffffff-no-rj',
+    subscribers: 5,
+    videoCount: 2,
+    viewCount: 32,
+    publishedAt: '2026-09-30',
+    videos: [
+      { id: 'Yvg44Y6fiO8', title: 'ZorzaOS', date: '2026-11-13T17:07:58Z', views: 17,
+        description: '🌌 Zorza OS 1.0 „Świt” – polski Linux na co dzień. Piękny od menu startowego po ekran logowania.' },
+      { id: 'xZ5-wYsV67g', title: 'Tworzenie Social Stats Hub', date: '2026-10-03T18:59:24Z', views: 15 }
+    ]
+  }
+};
+
+/* =====================================================================
+   KOD STRONY – zwykle nie trzeba tu nic zmieniać
+   ===================================================================== */
+(function () {
+  'use strict';
+  document.documentElement.classList.add('js');
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const CAN_EMBED = /^https?:$/.test(location.protocol); // YouTube nie odtwarza osadzonych filmów z file://
+  const handle = CONFIG.handle.replace(/^@?/, '@');
+  const CHANNEL_URL = 'https://www.youtube.com/' + handle;
+
+  /* ---------- formatowanie po polsku ---------- */
+  function trunc(x) { return x >= 10 ? Math.floor(x) : Math.floor(x * 10) / 10; }
+  function formatPL(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    const units = [[1e9, 'mld'], [1e6, 'mln'], [1e3, 'tys.']];
+    for (const [v, u] of units) {
+      if (n >= v) return String(trunc(n / v)).replace('.', ',') + ' ' + u;
+    }
+    return String(n);
+  }
+  function plural(n, one, few, many) {
+    if (n === 1) return one;
+    const d = n % 10, dd = n % 100;
+    return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
+  }
+  function viewsText(n) {
+    n = Number(n) || 0;
+    return n >= 1000 ? formatPL(n) + ' wyświetleń' : n + ' ' + plural(n, 'wyświetlenie', 'wyświetlenia', 'wyświetleń');
+  }
+  function dateText(d) {
+    const dt = new Date(d);
+    return isNaN(dt) ? '' : dt.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  /* ---------- ikony ---------- */
+  const ICONS = {
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8v14.4a1 1 0 0 0 1.5.9l11.3-7.2a1 1 0 0 0 0-1.8L8.5 3.9A1 1 0 0 0 7 4.8z"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg>',
+    arrow: '<svg class="link-arrow" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>',
+    youtube: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.2 3.6z"/></svg>',
+    tiktok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>',
+    instagram: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.3"/><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"/></svg>',
+    discord: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .09-.03c.46-.63.87-1.3 1.22-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.09-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z"/></svg>',
+    spotify: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10.5"/><path d="M6.5 9.2c3.8-1.1 8-.8 11.2 1M7.2 12.6c3.1-.9 6.5-.6 9.2.9M7.9 15.8c2.4-.6 4.9-.4 7 .7"/></svg>',
+    email: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 6.5 9 6.5 9-6.5"/></svg>'
+  };
+
+  /* ---------- pamięć podręczna (localStorage) ---------- */
+  const CACHE_KEY = 'tt-yt-cache-v1:' + handle.toLowerCase();
+  function cacheGet() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (!obj || Date.now() - obj.t > CONFIG.cacheMinutes * 60000) return null;
+      return obj.data;
+    } catch (e) { return null; }
+  }
+  function cacheSet(data) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), data })); } catch (e) { /* brak miejsca / tryb prywatny */ }
+  }
+
+  /* ---------- YouTube Data API v3 ---------- */
+  async function api(endpoint, params) {
+    const url = new URL('https://www.googleapis.com/youtube/v3/' + endpoint);
+    Object.entries(Object.assign({}, params, { key: CONFIG.YOUTUBE_API_KEY.trim() }))
+      .forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error('API ' + res.status);
+    return res.json();
+  }
+  function bestThumb(th, id) {
+    th = th || {};
+    const t = th.maxres || th.standard || th.high || th.medium || th.default;
+    return t ? t.url : 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+  }
+  async function loadFromApi() {
+    const ch = await api('channels', { part: 'snippet,statistics,contentDetails', forHandle: handle });
+    const c = ch.items && ch.items[0];
+    if (!c) throw new Error('Nie znaleziono kanału');
+    const uploads = c.contentDetails.relatedPlaylists.uploads;
+    const pl = await api('playlistItems', { part: 'contentDetails', playlistId: uploads, maxResults: Math.min(50, CONFIG.videosToShow) });
+    const ids = (pl.items || []).map(i => i.contentDetails && i.contentDetails.videoId).filter(Boolean);
+    let videos = [];
+    if (ids.length) {
+      const vs = await api('videos', { part: 'snippet,statistics', id: ids.join(',') });
+      videos = (vs.items || []).map(v => ({
+        id: v.id,
+        title: v.snippet.title,
+        date: v.snippet.publishedAt,
+        views: Number(v.statistics.viewCount || 0),
+        thumb: bestThumb(v.snippet.thumbnails, v.id),
+        description: (v.snippet.description || '').split('\n')[0]
+      })).sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+    const st = c.statistics || {};
+    const fb = CONFIG.fallback;
+    return {
+      source: 'api',
+      avatar: bestThumb(c.snippet.thumbnails, '') || fb.avatar,
+      subscribers: st.hiddenSubscriberCount ? fb.subscribers : Number(st.subscriberCount || 0),
+      videoCount: Number(st.videoCount || videos.length),
+      viewCount: Number(st.viewCount || 0),
+      publishedAt: c.snippet.publishedAt || fb.publishedAt,
+      videos
+    };
+  }
+  function fallbackData() {
+    const fb = CONFIG.fallback;
+    const videos = (fb.videos || []).map(v => typeof v === 'string' ? { id: v } : v).filter(v => v && v.id).map(v => ({
+      id: v.id,
+      title: v.title || 'Film na kanale ' + CONFIG.channelName,
+      date: v.date || '',
+      views: v.views == null ? null : Number(v.views),
+      thumb: 'https://i.ytimg.com/vi/' + v.id + '/hqdefault.jpg',
+      description: v.description || ''
+    }));
+    return {
+      source: 'fallback',
+      avatar: fb.avatar,
+      subscribers: fb.subscribers,
+      videoCount: fb.videoCount || videos.length,
+      viewCount: fb.viewCount,
+      publishedAt: fb.publishedAt,
+      videos
+    };
+  }
+  async function getData() {
+    if (!CONFIG.YOUTUBE_API_KEY || !CONFIG.YOUTUBE_API_KEY.trim()) return fallbackData();
+    const cached = cacheGet();
+    if (cached) return cached;
+    try {
+      const data = await loadFromApi();
+      if (!data.videos.length) throw new Error('Brak filmów');
+      cacheSet(data);
+      return data;
+    } catch (e) {
+      return fallbackData(); // cicho przechodzimy na dane zapasowe
+    }
+  }
+
+  /* ---------- licznik ---------- */
+  function countUp(el, target) {
+    target = Number(target) || 0;
+    if (reduceMotion.matches || target === 0) { el.textContent = formatPL(target); return; }
+    const dur = Math.min(2400, 1200 + target.toString().length * 150);
+    const start = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 4);
+      el.textContent = formatPL(Math.round(target * eased));
+      if (p < 1) requestAnimationFrame(step);
+    })(start);
+  }
+
+  /* ---------- renderowanie ---------- */
+  function embedSrc(id, autoplay) {
+    return 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?rel=0&modestbranding=1' + (autoplay ? '&autoplay=1' : '');
+  }
+  function iframe(id, title, autoplay) {
+    return '<iframe src="' + embedSrc(id, autoplay) + '" title="' + esc(title) + '" loading="lazy" ' +
+      'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
+      'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
+  }
+  function watchUrl(id) { return 'https://www.youtube.com/watch?v=' + encodeURIComponent(id); }
+  function metaHtml(v) {
+    let m = '';
+    if (v.date) m += '<span>' + ICONS.cal + esc(dateText(v.date)) + '</span>';
+    if (v.views != null) m += '<span>' + ICONS.eye + esc(viewsText(v.views)) + '</span>';
+    return m;
+  }
+
+  function renderChannel(d) {
+    const wrap = $('#avatar-wrap'), img = $('#avatar');
+    if (d.avatar) {
+      img.onerror = () => wrap.classList.add('no-img');
+      img.src = d.avatar;
+    } else wrap.classList.add('no-img');
+
+    countUp($('#subs'), d.subscribers);
+    countUp($('#vcount'), d.videoCount);
+    countUp($('#views'), d.viewCount);
+    $('#t-videos').textContent = formatPL(d.videoCount);
+    $('#t-views').textContent = formatPL(d.viewCount);
+    const since = new Date(d.publishedAt);
+    $('#t-since').textContent = isNaN(since) ? '–' :
+      since.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase());
+  }
+
+  function renderLatest(v) {
+    const box = $('#latest');
+    if (!v) { box.closest('section').hidden = true; return; }
+    const player = CAN_EMBED ? iframe(v.id, v.title, false) :
+      '<a class="facade" href="' + watchUrl(v.id) + '" target="_blank" rel="noopener" aria-label="Obejrzyj na YouTube: ' + esc(v.title) + '">' +
+      '<img src="' + esc(v.thumb) + '" alt="" loading="lazy"><span class="play">' + ICONS.play + '</span>' +
+      '<span class="facade-note">Podgląd lokalny – kliknij, aby obejrzeć na YouTube</span></a>';
+    box.innerHTML =
+      '<div class="player">' + player + '</div>' +
+      '<div class="latest-info">' +
+        '<span class="badge">Najnowszy</span>' +
+        '<h3>' + esc(v.title) + '</h3>' +
+        '<div class="meta">' + metaHtml(v) + '</div>' +
+        (v.description ? '<p class="latest-desc">' + esc(v.description) + '</p>' : '') +
+        '<a class="btn" href="' + watchUrl(v.id) + '" target="_blank" rel="noopener">' + ICONS.youtube + 'Otwórz na YouTube</a>' +
+      '</div>';
+  }
+
+  function renderGrid(videos) {
+    const grid = $('#grid');
+    const list = videos.slice(0, CONFIG.videosToShow);
+    let html = list.map((v, i) =>
+      '<button class="card vcard reveal d' + (i % 3) + '" type="button" data-id="' + esc(v.id) + '" data-title="' + esc(v.title) + '">' +
+        '<div class="thumb"><img src="' + esc(v.thumb) + '" alt="" loading="lazy" width="480" height="270">' +
+          (i === 0 ? '<span class="badge">Nowość</span>' : '') +
+          '<span class="play">' + ICONS.play + '</span></div>' +
+        '<div class="vbody"><h3 class="vtitle">' + esc(v.title) + '</h3><div class="meta">' + metaHtml(v) + '</div></div>' +
+      '</button>'
+    ).join('');
+    // Mało filmów? Uzupełniamy siatkę kartą zachęcającą do subskrypcji – bez pustych miejsc.
+    if (list.length % 3 !== 0 || list.length === 0) {
+      html += '<div class="card cta-card reveal">' +
+        '<strong>Kolejne filmy już wkrótce</strong>' +
+        '<p>Subskrybuj kanał i włącz dzwonek, żeby nie przegapić premiery.</p>' +
+        '<a class="btn btn-sub" href="' + CHANNEL_URL + '?sub_confirmation=1" target="_blank" rel="noopener">Subskrybuj</a></div>';
+    }
+    grid.innerHTML = html;
+    grid.setAttribute('aria-busy', 'false');
+    $$('.reveal', grid).forEach(observeReveal);
+  }
+
+  function renderStatic() {
+    $('#hero-desc').textContent = CONFIG.texts.heroDescription;
+    $('#about-text').innerHTML =
+      '<h3>' + esc(CONFIG.texts.aboutTitle) + '</h3>' +
+      CONFIG.texts.about.map(p => '<p>' + esc(p) + '</p>').join('') +
+      (CONFIG.texts.tags && CONFIG.texts.tags.length ? '<div class="tags">' + CONFIG.texts.tags.map(t => '<span class="tag">#' + esc(t) + '</span>').join('') + '</div>' : '');
+    $('#contact-text').textContent = CONFIG.texts.contact;
+    $$('.js-sub').forEach(a => { a.href = CHANNEL_URL + '?sub_confirmation=1'; });
+    $$('.js-videos').forEach(a => { a.href = CHANNEL_URL + '/videos'; });
+    $('#year').textContent = new Date().getFullYear();
+
+    // e-mail
+    const email = (CONFIG.email || '').trim();
+    const contactSection = $('#kontakt');
+    if (!email) { contactSection.hidden = true; $$('a[href="#kontakt"]').forEach(a => a.closest('li').hidden = true); }
+    else {
+      $('#email').textContent = email;
+      $('#mailto').href = 'mailto:' + email;
+    }
+
+    // linki – puste ukrywamy
+    const links = CONFIG.links.filter(l => l && l.url && l.url.trim());
+    const linksBox = $('#links');
+    if (!links.length) { $('#linki').hidden = true; $$('a[href="#linki"]').forEach(a => a.closest('li').hidden = true); }
+    linksBox.innerHTML = links.map((l, i) => {
+      const ext = !/^mailto:/i.test(l.url);
+      return '<a class="card link-tile reveal d' + (i % 3) + '" href="' + esc(l.url) + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' +
+        '<span class="link-ico">' + (ICONS[l.type] || ICONS.arrow) + '</span>' +
+        '<span class="link-text"><strong>' + esc(l.label) + '</strong>' + (l.sub ? '<span>' + esc(l.sub) + '</span>' : '') + '</span>' +
+        ICONS.arrow + '</a>';
+    }).join('');
+    // przy 1–2 kafelkach wyśrodkuj siatkę
+    if (links.length && links.length < 3) linksBox.style.cssText = 'max-width:' + (links.length * 380) + 'px;margin-inline:auto;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))';
+  }
+
+  /* ---------- kopiowanie e-maila ---------- */
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+  function legacyCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0;top:0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove(); return ok;
+  }
+  $('#copy').addEventListener('click', async () => {
+    const text = (CONFIG.email || '').trim();
+    let ok = false;
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { ok = false; }
+    if (!ok) ok = legacyCopy(text);
+    const label = $('#copy span');
+    label.textContent = ok ? 'Skopiowano!' : 'Zaznacz i skopiuj';
+    toast(ok ? 'Adres e-mail skopiowany do schowka' : 'Nie udało się skopiować – zaznacz adres ręcznie');
+    setTimeout(() => { label.textContent = 'Kopiuj'; }, 2200);
+  });
+
+  /* ---------- modal z filmem ---------- */
+  const modal = $('#modal'), modalPlayer = $('#modal-player');
+  let lastFocus = null;
+  function openModal(id, title) {
+    if (!CAN_EMBED) { window.open(watchUrl(id), '_blank', 'noopener'); return; }
+    lastFocus = document.activeElement;
+    $('#modal-title').textContent = title;
+    modalPlayer.innerHTML = iframe(id, title, true);
+    modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    $('#modal-close').focus();
+  }
+  function closeModal() {
+    if (!modal.classList.contains('open')) return;
+    modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    setTimeout(() => { modalPlayer.innerHTML = ''; }, 300);
+    if (lastFocus) lastFocus.focus();
+  }
+  $('#grid').addEventListener('click', e => {
+    const card = e.target.closest('.vcard');
+    if (card) openModal(card.dataset.id, card.dataset.title);
+  });
+  $('#modal-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeModal(); setMenu(false); }
+  });
+
+  /* ---------- nawigacja ---------- */
+  const nav = $('#nav'), burger = $('#burger');
+  function setMenu(open) {
+    nav.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', String(open));
+    burger.setAttribute('aria-label', open ? 'Zamknij menu' : 'Otwórz menu');
+  }
+  burger.addEventListener('click', () => setMenu(!nav.classList.contains('open')));
+  $$('#nav-menu a').forEach(a => a.addEventListener('click', () => setMenu(false)));
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 10);
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  // podświetlanie aktywnej sekcji
+  const navMap = {};
+  $$('.nav-links a').forEach(a => { navMap[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window) {
+    const so = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        Object.values(navMap).forEach(a => a.classList.remove('active'));
+        if (navMap[en.target.id]) navMap[en.target.id].classList.add('active');
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    ['top', 'najnowszy', 'filmy', 'o-kanale', 'linki', 'kontakt'].forEach(id => { const el = document.getElementById(id); if (el) so.observe(el); });
+  }
+
+  /* ---------- pojawianie się sekcji ---------- */
+  let revealObs = null;
+  if ('IntersectionObserver' in window && !reduceMotion.matches) {
+    revealObs = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); revealObs.unobserve(en.target); } });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  }
+  function observeReveal(el) { if (revealObs) revealObs.observe(el); else el.classList.add('in'); }
+
+  /* ---------- animowane tło: equalizer + fale ---------- */
+  function initEqualizer() {
+    const canvas = $('#eq');
+    const ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx) return;
+    const hero = $('.hero');
+    let w = 0, h = 0, dpr = 1, raf = 0, visible = true, last = 0;
+    const FPS = 30;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      w = hero.clientWidth; h = hero.clientHeight;
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(performance.now());
+    }
+
+    function draw(t) {
+      ctx.clearRect(0, 0, w, h);
+      const n = Math.max(20, Math.min(90, Math.floor(w / 20)));
+      const bw = w / n, gap = Math.max(3, bw * 0.28), maxH = h * 0.5;
+      const grad = ctx.createLinearGradient(0, h, 0, h - maxH);
+      grad.addColorStop(0, 'rgba(0,229,255,0.30)');
+      grad.addColorStop(0.6, 'rgba(0,229,255,0.12)');
+      grad.addColorStop(1, 'rgba(0,229,255,0)');
+      ctx.fillStyle = grad;
+      for (let i = 0; i < n; i++) {
+        const p = i / (n - 1);
+        const s = Math.sin(t * 0.0021 + i * 0.37) * 0.38 + Math.sin(t * 0.0034 + i * 0.13 + 1.7) * 0.28 + Math.sin(t * 0.0011 + i * 0.83) * 0.22;
+        const v = Math.max(0.06, Math.min(1, (s + 0.95) / 1.85));
+        const env = 0.35 + 0.65 * Math.sin(Math.PI * p);
+        const bh = v * env * maxH;
+        ctx.fillRect(i * bw + gap / 2, h - bh, bw - gap, bh);
+      }
+      // przerwy między „diodami” equalizera
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000';
+      for (let y = h - 7; y > h - maxH; y -= 7) ctx.fillRect(0, y, w, 2);
+      ctx.globalCompositeOperation = 'source-over';
+
+      // fale dźwiękowe
+      const waves = [
+        { a: 26, f: 0.010, s: 0.0009, o: 0, c: 'rgba(0,229,255,0.16)' },
+        { a: 18, f: 0.016, s: -0.0013, o: 2, c: 'rgba(58,181,255,0.12)' },
+        { a: 34, f: 0.007, s: 0.0006, o: 4, c: 'rgba(0,229,255,0.07)' }
+      ];
+      ctx.lineWidth = 1.5;
+      const mid = h * 0.62;
+      waves.forEach(wv => {
+        ctx.strokeStyle = wv.c;
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += 8) {
+          const env = Math.sin(Math.PI * x / w);
+          const y = mid + Math.sin(x * wv.f + t * wv.s + wv.o) * wv.a * env * (0.7 + 0.3 * Math.sin(t * 0.0007 + wv.o));
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      });
+    }
+
+    function loop(t) {
+      raf = requestAnimationFrame(loop);
+      if (t - last < 1000 / FPS) return;
+      last = t; draw(t);
+    }
+    function start() { if (!raf && visible && !document.hidden && !reduceMotion.matches) raf = requestAnimationFrame(loop); }
+    function stop() { cancelAnimationFrame(raf); raf = 0; }
+
+    let rt = 0;
+    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 120); });
+    document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(([en]) => { visible = en.isIntersecting; visible ? start() : stop(); }).observe(hero);
+    }
+    const onMotion = () => { if (reduceMotion.matches) { stop(); draw(0); } else start(); };
+    if (reduceMotion.addEventListener) reduceMotion.addEventListener('change', onMotion);
+    resize(); start();
+  }
+
+  /* ---------- start ---------- */
+  renderStatic();
+  $$('.reveal').forEach(observeReveal);
+  initEqualizer();
+  getData().then(d => {
+    renderChannel(d);
+    renderLatest(d.videos[0]);
+    renderGrid(d.videos);
+  });
+})();
+</script>
+</body>
+</html>
